@@ -1,0 +1,4 @@
+github.com/ebitengine/purego v0.9.1 h1:a/k2f2HQU3Pi399RPW1MOaZyhKJL9w/xFpKAg4q1s0A=
+github.com/ebitengine/purego v0.9.1/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
+rafaelmartins.com/p/usbhid v0.0.0-20260201162308-12aff85c336f h1:bUipHD1FDOFXQeuUILsnn560UAVvEfeuDl4MMvyAmvw=
+rafaelmartins.com/p/usbhid v0.0.0-20260201162308-12aff85c336f/go.mod h1:Rta/iJgy+IuDjpHCBFwHKTNDfHI2i2z7HfO/re/sOV8=

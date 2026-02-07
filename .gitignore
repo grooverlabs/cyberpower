@@ -1,0 +1,21 @@
+# Binaries
+cyberpower
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Dependencies (local clones/submodules ignored in favor of go.mod)
+nut/
+usbhid/
+vendor/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*~
