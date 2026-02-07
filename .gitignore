@@ -1,9 +1,14 @@
 # Binaries
-cyberpower
+ups-cli
+ups-monitor
 *.exe
 *.dll
 *.so
 *.dylib
+
+# Logs and reference files
+*.txt
+*.log
 
 # Dependencies (local clones/submodules ignored in favor of go.mod)
 vendor/

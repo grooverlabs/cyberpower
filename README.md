@@ -19,10 +19,11 @@ This tool provides real-time status (Voltage, Load, Battery), Beeper control, an
     cd cyberpower
     ```
 
-2.  **Build the binary:**
+2.  **Build the project:**
     ```bash
-    go build -o cyberpower main.go
+    make
     ```
+    This will create the `ups-cli` tool and the `ups-monitor` service.
 
 ## Setup (Linux Permissions)
 
@@ -49,7 +50,7 @@ To access the USB device without `sudo`, add a udev rule:
 ### Monitor Status (Default)
 Simply run the tool to see the status of all connected devices.
 ```bash
-./cyberpower
+./ups-cli
 ```
 
 **Example Output:**
@@ -77,19 +78,19 @@ Status:
 
 **Disable Beeper:**
 ```bash
-./cyberpower -beeper disable
+./ups-cli -beeper disable
 ```
 
 **Enable Beeper:**
 ```bash
-./cyberpower -beeper enable
+./ups-cli -beeper enable
 ```
 
 **Run Battery Test:**
 ```bash
-./cyberpower -test quick   # 10-second test
-./cyberpower -test deep    # Runs until battery is low
-./cyberpower -test stop    # Abort running test
+./ups-cli -test quick   # 10-second test
+./ups-cli -test deep    # Runs until battery is low
+./ups-cli -test stop    # Abort running test
 ```
 
 ## Technical Details (CP1500PFCLCDa)
