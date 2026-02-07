@@ -56,11 +56,10 @@ type UPS struct {
 // program has permission to read.
 func List() ([]*UPS, error) {
 	filter := func(d *usbhid.Device) bool {
-		// Accept any device with the CyberPower Vendor ID.
-		if d.VendorId() == cyberPowerVendorID {
-			return true
-		}
-		return false
+		// Only accept the specific model (CP1500PFCLCDa) that we have verified.
+		// Other models may use different HID Report IDs, so using them with
+		// this hardcoded protocol implementation could be dangerous.
+		return d.VendorId() == cyberPowerVendorID && d.ProductId() == cp1500ProductID
 	}
 
 	devices, err := usbhid.Enumerate(filter)
