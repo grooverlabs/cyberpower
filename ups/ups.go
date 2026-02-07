@@ -27,6 +27,7 @@ type Properties struct {
 	VendorID       string
 	ProductID      string
 	BatteryType    string
+	SerialNumber   string
 }
 
 // Status represents the current state of the UPS.
@@ -38,7 +39,7 @@ type Status struct {
 	BatteryCapacity  int
 	RemainingRuntime int
 	Load             int
-	LoadPercentage   int // This might be derived from Load and RatingPower
+	LoadPercentage   int
 	InputFrequency   float64
 	Temperature      float64
 	LineInteraction  string
@@ -57,8 +58,6 @@ type UPS struct {
 func List() ([]*UPS, error) {
 	filter := func(d *usbhid.Device) bool {
 		// Only accept the specific model (CP1500PFCLCDa) that we have verified.
-		// Other models may use different HID Report IDs, so using them with
-		// this hardcoded protocol implementation could be dangerous.
 		return d.VendorId() == cyberPowerVendorID && d.ProductId() == cp1500ProductID
 	}
 
@@ -77,6 +76,30 @@ func List() ([]*UPS, error) {
 	}
 
 	return upsDevices, nil
+}
+
+// Load finds and returns a specific connected CyberPower UPS device by its Serial Number.
+func Load(serial string) (*UPS, error) {
+	filter := func(d *usbhid.Device) bool {
+		return d.VendorId() == cyberPowerVendorID && d.ProductId() == cp1500ProductID && d.SerialNumber() == serial
+	}
+
+	devices, err := usbhid.Enumerate(filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to enumerate HID devices: %w", err)
+	}
+
+	if len(devices) == 0 {
+		return nil, fmt.Errorf("no UPS found with serial number %q", serial)
+	}
+
+	// In the unlikely event of duplicates, we take the first one.
+	dev := devices[0]
+	if err := dev.Open(true); err != nil {
+		return nil, fmt.Errorf("failed to open device %s: %w", dev, err)
+	}
+
+	return &UPS{device: dev}, nil
 }
 
 // Close releases the handle to the UPS device.
@@ -159,6 +182,7 @@ func (u *UPS) GetProperties() (*Properties, error) {
 		RatingVoltage:  fmt.Sprintf("%d V", ratingVoltage),
 		RatingPower:    ratingPower,
 		NominalPowerVA: nominalPowerVA,
+		SerialNumber:   u.device.SerialNumber(),
 	}, nil
 }
 
@@ -252,7 +276,6 @@ ParseReport:
 	}
 
 	// Override Status based on Voltages if logic suggests On Battery
-	// (Fixes laggy status bits on some firmware revisions)
 	if status.UtilityVoltage < 50 && status.OutputVoltage > 100 {
 		status.State = "On Battery"
 		status.PowerSupplyBy = "Battery"
@@ -289,8 +312,6 @@ func (u *UPS) SetBeeper(enabled bool) error {
 	if u.device == nil || !u.device.IsOpen() {
 		return fmt.Errorf("device is not open")
 	}
-	// Correct Report ID for Beeper is 0x0c (from NUT debug)
-	// 1 = disabled, 2 = enabled, 3 = muted
 	val := byte(1) // Disable
 	if enabled {
 		val = byte(2) // Enable
@@ -304,7 +325,6 @@ func (u *UPS) GetBeeperStatus() (int, error) {
 	if u.device == nil || !u.device.IsOpen() {
 		return 0, fmt.Errorf("device is not open")
 	}
-	// Correct Report ID for Beeper is 0x0c
 	buf, err := u.device.GetFeatureReport(0x0c)
 	if err != nil {
 		return 0, err
@@ -332,8 +352,6 @@ func (u *UPS) StartQuickTest() error {
 	if u.device == nil || !u.device.IsOpen() {
 		return fmt.Errorf("device is not open")
 	}
-	// Correct Report ID for Test is 0x14 (from NUT debug)
-	// Value 1 = Quick Test
 	return u.device.SetFeatureReport(0x14, []byte{1})
 }
 
@@ -342,7 +360,6 @@ func (u *UPS) StartDeepTest() error {
 	if u.device == nil || !u.device.IsOpen() {
 		return fmt.Errorf("device is not open")
 	}
-	// Value 2 = Deep Test
 	return u.device.SetFeatureReport(0x14, []byte{2})
 }
 
@@ -351,7 +368,6 @@ func (u *UPS) StopTest() error {
 	if u.device == nil || !u.device.IsOpen() {
 		return fmt.Errorf("device is not open")
 	}
-	// Value 3 = Abort Test
 	return u.device.SetFeatureReport(0x14, []byte{3})
 }
 
