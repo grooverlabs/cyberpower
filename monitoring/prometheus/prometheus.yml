@@ -1,0 +1,5 @@
+scrape_configs:
+  - job_name: 'cyberpower-ups'
+    static_configs:
+      - targets: ['localhost:9999']
+    scrape_interval: 15s

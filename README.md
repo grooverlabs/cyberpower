@@ -115,6 +115,34 @@ Status:
 ./ups-cli -test stop    # Abort running test
 ```
 
+## Monitoring with Prometheus & Grafana
+
+The `ups-monitor` service exports standard Prometheus metrics on port `9999` at the `/metrics` endpoint.
+
+### Prometheus Configuration
+To scrape metrics, add the following to your `prometheus.yml`:
+```yaml
+scrape_configs:
+  - job_name: 'cyberpower-ups'
+    static_configs:
+      - targets: ['<your-ups-host>:9999']
+```
+A sample configuration is provided in `monitoring/prometheus/prometheus.yml`.
+
+### Grafana Dashboard
+A pre-configured Grafana dashboard is available in `monitoring/grafana/dashboard.json`.
+1.  Open Grafana.
+2.  Go to **Dashboards** -> **Import**.
+3.  Upload the `dashboard.json` file or paste its contents.
+4.  Select your Prometheus datasource.
+
+The dashboard includes:
+*   **Battery Charge Gauge** (with color thresholds).
+*   **Load Gauge** (Percentage).
+*   **Voltage Levels Graph** (Input vs. Output).
+*   **Load History** (Watts).
+*   **Status Stat** (Normal, On Battery, Low Battery).
+
 ## Technical Details (CP1500PFCLCDa)
 
 This tool uses specific HID Report IDs verified against this model to ensure safety and accuracy:
