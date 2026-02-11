@@ -100,3 +100,13 @@ This tool uses specific HID Report IDs verified against this model to ensure saf
 *   **Test Control:** Report `0x14` (Values: 1=Quick, 2=Deep, 3=Abort)
 *   **Load Power:** Report `0x19` (Active Power Watts)
 *   **Load %:** Report `0x13`
+
+## Power Control & Shutdown
+
+This library intentionally **does not** implement features to turn off the UPS outlets (Load Shedding) or initiate a device shutdown (`Shutdown()`, `ShutdownAndStayOff()`, etc.).
+
+While the HID Report IDs for these features on the CP1500PFCLCDa are identified in other projects (typically Report `0x15` for `DelayBeforeShutdown`), we have decided not to include them for the following reasons:
+
+1.  **Risk of Accidental Power Loss:** Triggering these commands physically cuts power to all devices connected to the "Battery + Surge" outlets. A bug, network error, or accidental API call could result in immediate data loss or hardware damage for connected systems.
+2.  **Safety First:** Unlike beeper control or battery tests, which are non-destructive, power-cycling a UPS remotely is a high-stakes operation. This is best handled by established, hardened tools like Network UPS Tools (NUT) if such functionality is required.
+3.  **Hardware Dependency:** Power-off byte sequences are highly specific to firmware revisions. Using the wrong values can lead to "zombie" states where the UPS remains off even after utility power returns.
