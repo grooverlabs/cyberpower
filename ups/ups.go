@@ -19,32 +19,28 @@ const (
 
 // Properties represents the static information about the UPS.
 type Properties struct {
-	ModelName      string
-	FirmwareNumber string
-	RatingVoltage  string
-	RatingPower    string
-	NominalPowerVA int
-	VendorID       string
-	ProductID      string
-	BatteryType    string
-	SerialNumber   string
+	ModelName      string `json:"model_name"`
+	FirmwareNumber string `json:"firmware_number"`
+	RatingVoltage  string `json:"rating_voltage"`
+	RatingPower    string `json:"rating_power"`
+	NominalPowerVA int    `json:"nominal_power_va"`
+	VendorID       string `json:"vendor_id"`
+	ProductID      string `json:"product_id"`
+	SerialNumber   string `json:"serial_number"`
 }
 
 // Status represents the current state of the UPS.
 type Status struct {
-	State            string
-	PowerSupplyBy    string
-	UtilityVoltage   int
-	OutputVoltage    int
-	BatteryCapacity  int
-	RemainingRuntime int
-	Load             int
-	LoadPercentage   int
-	InputFrequency   float64
-	Temperature      float64
-	LineInteraction  string
-	TestResult       string
-	LastPowerEvent   string
+	State            string  `json:"state"`
+	PowerSupplyBy    string  `json:"power_supply_by"`
+	UtilityVoltage   int     `json:"utility_voltage"`
+	OutputVoltage    int     `json:"output_voltage"`
+	BatteryCapacity  int     `json:"battery_capacity"`
+	RemainingRuntime int     `json:"remaining_runtime"`
+	Load             int     `json:"load_watts"`
+	LoadPercentage   int     `json:"load_percentage"`
+	InputFrequency   float64 `json:"input_frequency"`
+	TestResult       string  `json:"test_result"`
 }
 
 // UPS provides methods to interact with a single CyberPower UPS device.
@@ -227,7 +223,7 @@ ParseReport:
 	runtimeSeconds := binary.BigEndian.Uint16(buf[2:4])
 
 	status := &Status{
-		BatteryCapacity: int(buf[0]),
+		BatteryCapacity:  int(buf[0]),
 		RemainingRuntime: int(runtimeSeconds / 60), // Convert seconds to minutes
 	}
 
@@ -256,7 +252,7 @@ ParseReport:
 			status.PowerSupplyBy = "Utility Power (Charging)"
 		}
 	}
-	
+
 	// Get Utility Voltage from feature report 0x0f
 	utilVoltageBuf, err := u.device.GetFeatureReport(0x0f)
 	if err == nil && len(utilVoltageBuf) > 0 {
