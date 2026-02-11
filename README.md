@@ -129,6 +129,19 @@ scrape_configs:
 ```
 A sample configuration is provided in `monitoring/prometheus/prometheus.yml`.
 
+### Alerting
+You can configure Prometheus to alert you when utility power is lost. A sample alert rule file is provided in `monitoring/prometheus/alerts.yml`.
+
+To use it, add the following to your `prometheus.yml`:
+```yaml
+rule_files:
+  - "alerts.yml"
+```
+
+The provided alerts cover:
+*   **UPSOnBattery**: Triggers when `ups_status_code > 0` (Utility power lost).
+*   **UPSLowBattery**: Triggers when `ups_status_code == 2` (Critical battery level).
+
 ### Grafana Dashboard
 A pre-configured Grafana dashboard is available in `monitoring/grafana/dashboard.json`.
 1.  Open Grafana.

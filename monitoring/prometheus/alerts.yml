@@ -1,0 +1,20 @@
+groups:
+  - name: cyberpower-ups-alerts
+    rules:
+      - alert: UPSOnBattery
+        expr: ups_status_code > 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "UPS {{ $labels.serial }} is on battery power"
+          description: "Utility power for UPS {{ $labels.serial }} ({{ $labels.model }}) has been lost. The system is now running on battery."
+
+      - alert: UPSLowBattery
+        expr: ups_status_code == 2
+        for: 10s
+        labels:
+          severity: critical
+        annotations:
+          summary: "UPS {{ $labels.serial }} has low battery!"
+          description: "UPS {{ $labels.serial }} ({{ $labels.model }}) is on battery and has reached the 'Low Battery' threshold. Immediate shutdown may be required."
