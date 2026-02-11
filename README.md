@@ -13,6 +13,7 @@ This tool provides real-time status (Voltage, Load, Battery), Beeper control, an
 
 ## Installation
 
+### From Source
 1.  **Clone the repository:**
     ```bash
     git clone <repository-url>
@@ -25,7 +26,28 @@ This tool provides real-time status (Voltage, Load, Battery), Beeper control, an
     ```
     This will create the `ups-cli` tool and the `ups-monitor` service.
 
-## Setup (Linux Permissions)
+### As a Debian Package
+The project includes an `nfpm` configuration to build a `.deb` package that automatically handles udev rules, user creation, and systemd service setup.
+
+1.  **Build the package:**
+    ```bash
+    make deb
+    ```
+
+2.  **Install the package:**
+    ```bash
+    sudo dpkg -i cyberpower-ups_*.deb
+    ```
+
+3.  **Remove the package:**
+    ```bash
+    sudo apt remove cyberpower-ups
+    # or
+    sudo dpkg -r cyberpower-ups
+    ```
+
+## Setup (Manual)
+*Note: This is only required if you are not using the Debian package.*
 
 To access the USB device without `sudo`, add a udev rule:
 

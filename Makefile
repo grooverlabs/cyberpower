@@ -6,10 +6,14 @@ MONITOR_BINARY=ups-monitor
 CLI_DIR=./cmd/cli
 MONITOR_DIR=./cmd/monitor
 
-.PHONY: all cli monitor clean test check
+.PHONY: all cli monitor clean test check deb
 
 # Default target
 all: cli monitor
+
+# Build the Debian package (requires nfpm)
+deb: all
+	nfpm package --packager deb --target .
 
 # Build the main CLI tool
 cli:
@@ -29,4 +33,4 @@ check:
 
 # Remove binaries
 clean:
-	rm -f $(CLI_BINARY) $(MONITOR_BINARY)
+	rm -f $(CLI_BINARY) $(MONITOR_BINARY) *.deb
