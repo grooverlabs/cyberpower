@@ -1,7 +1,7 @@
 name: "cyberpower-ups"
-arch: "amd64"
+arch: "${ARCH}"
 platform: "linux"
-version: "0.0.1"
+version: "${VERSION}"
 section: "utils"
 priority: "optional"
 maintainer: "Paul Maseberg <paulm@grooverlabs.org>"
@@ -9,16 +9,16 @@ description: |
   CyberPower UPS Monitoring Tool and Service.
   Provides a CLI tool and a background service for monitoring CyberPower UPS devices via USB HID.
 vendor: "Groover Labs"
-homepage: "https://github.com/pmaseberg/cyberpower"
+homepage: "https://github.com/grooverlabs/cyberpower"
 license: "MIT"
 
 contents:
-  - src: ./ups-cli
+  - src: ./bin/ups-cli-pkg
     dst: /usr/bin/ups-cli
-  - src: ./ups-monitor
+  - src: ./bin/ups-monitor-pkg
     dst: /usr/bin/ups-monitor
   - src: ./packaging/cyberpower-ups-monitor.service
-    dst: /etc/systemd/system/cyberpower-ups-monitor.service
+    dst: /lib/systemd/system/cyberpower-ups-monitor.service
   - src: ./packaging/99-cyberpower.rules
     dst: /etc/udev/rules.d/99-cyberpower.rules
 
@@ -27,11 +27,3 @@ scripts:
   postinstall: ./packaging/scripts/postinstall.sh
   preremove: ./packaging/scripts/preremove.sh
   postremove: ./packaging/scripts/postremove.sh
-
-overrides:
-  deb:
-    scripts:
-      preinstall: ./packaging/scripts/preinstall.sh
-      postinstall: ./packaging/scripts/postinstall.sh
-      preremove: ./packaging/scripts/preremove.sh
-      postremove: ./packaging/scripts/postremove.sh
