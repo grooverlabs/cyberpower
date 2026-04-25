@@ -55,5 +55,5 @@ contents:
       group: "root"
 
 scripts:
-  postinstall: ./packaging/postinstall.sh
-  preremove: ./packaging/preremove.sh
+  postinstall: ./packaging/scripts/postinstall.sh
+  preremove: ./packaging/scripts/preremove.sh
