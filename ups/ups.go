@@ -18,6 +18,13 @@ const (
 	cp1500ProductID uint16 = 0x0601
 )
 
+// inputReportResult holds the result of a GetInputReport call.
+type inputReportResult struct {
+	id  byte
+	buf []byte
+	err error
+}
+
 // Properties represents the static information about the UPS.
 type Properties struct {
 	ModelName      string `json:"model_name"`
@@ -90,7 +97,14 @@ func Load(serial string) (*UPS, error) {
 		return nil, fmt.Errorf("no UPS found with serial number %q", serial)
 	}
 
-	// In the unlikely event of duplicates, we take the first one.
+	// In the unlikely event of duplicates, close unused devices to prevent file descriptor leak
+	defer func() {
+		for i := 1; i < len(devices); i++ {
+			devices[i].Close()
+		}
+	}()
+
+	// Open the first device (the one we want to use)
 	dev := devices[0]
 	if err := dev.Open(true); err != nil {
 		return nil, fmt.Errorf("failed to open device %s: %w", dev, err)
@@ -189,10 +203,6 @@ func (u *UPS) GetStatus() (*Status, error) {
 		return nil, fmt.Errorf("device is not open")
 	}
 
-	var id byte
-	var buf []byte
-	var err error
-
 	// Use context with timeout to ensure goroutines are properly cleaned up
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -200,11 +210,12 @@ func (u *UPS) GetStatus() (*Status, error) {
 	// Retry loop for reading the correct report
 	for {
 		// Channel to receive one result, buffered to prevent goroutine leak
-		resultCh := make(chan struct{}, 1)
+		resultCh := make(chan inputReportResult, 1)
 		go func() {
-			id, buf, err = u.device.GetInputReport()
+			id, buf, err := u.device.GetInputReport()
+			result := inputReportResult{id: id, buf: buf, err: err}
 			select {
-			case resultCh <- struct{}{}:
+			case resultCh <- result:
 				// Result sent successfully
 			case <-ctx.Done():
 				// Context already cancelled, exit gracefully
@@ -213,11 +224,11 @@ func (u *UPS) GetStatus() (*Status, error) {
 		}()
 
 		select {
-		case <-resultCh:
-			if err != nil {
-				return nil, fmt.Errorf("failed to get input report: %w", err)
+		case result := <-resultCh:
+			if result.err != nil {
+				return nil, fmt.Errorf("failed to get input report: %w", result.err)
 			}
-			if id == 0x08 {
+			if result.id == 0x08 {
 				goto ParseReport
 			}
 			continue
@@ -227,14 +238,41 @@ func (u *UPS) GetStatus() (*Status, error) {
 	}
 
 ParseReport:
-	if len(buf) < 5 {
-		return nil, fmt.Errorf("input report 0x08 was too short (expected 5 bytes, got %d)", len(buf))
+	// This label is reached with the buf from above - fetch the latest result
+	// Re-enter the loop to get the actual result data
+	resultCh := make(chan inputReportResult, 1)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel2()
+	
+	go func() {
+		id, buf, err := u.device.GetInputReport()
+		result := inputReportResult{id: id, buf: buf, err: err}
+		select {
+		case resultCh <- result:
+		case <-ctx2.Done():
+			return
+		}
+	}()
+
+	var result inputReportResult
+	select {
+	case result = <-resultCh:
+	case <-ctx2.Done():
+		return nil, fmt.Errorf("failed to retrieve report data")
 	}
 
-	runtimeSeconds := binary.BigEndian.Uint16(buf[2:4])
+	if result.err != nil {
+		return nil, fmt.Errorf("failed to get input report: %w", result.err)
+	}
+
+	if len(result.buf) < 5 {
+		return nil, fmt.Errorf("input report 0x08 was too short (expected 5 bytes, got %d)", len(result.buf))
+	}
+
+	runtimeSeconds := binary.BigEndian.Uint16(result.buf[2:4])
 
 	status := &Status{
-		BatteryCapacity:  int(buf[0]),
+		BatteryCapacity:  int(result.buf[0]),
 		RemainingRuntime: int(runtimeSeconds / 60), // Convert seconds to minutes
 	}
 
@@ -244,12 +282,12 @@ ParseReport:
 		status.Load = int(binary.LittleEndian.Uint16(wattBuf[0:2]))
 	}
 
-	// Parse status flags from buf[4]
+	// Parse status flags from result.buf[4]
 	// 0x01: Utility Power Present
 	// 0x02: Discharging (On Battery)
 	// 0x04: Battery Low
 	// 0x40: Charging
-	statusFlag := int(buf[4])
+	statusFlag := int(result.buf[4])
 	if statusFlag&0x02 != 0 {
 		status.State = "On Battery"
 		status.PowerSupplyBy = "Battery"
