@@ -1,14 +1,56 @@
 [Unit]
-Description=CyberPower UPS Monitor Service
-After=network.target
+Description=CyberPower UPS Monitoring Service
+Documentation=https://github.com/grooverlabs/cyberpower
+After=udev.service network.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-User=cyberpower-ups
-Group=plugdev
+
+# Run as dedicated user with group membership for USB access
+User=ups-monitor
+Group=ups-monitor
+SupplementaryGroups=plugdev
+
+# Binary and working directory
 ExecStart=/usr/bin/ups-monitor
-Restart=always
+WorkingDirectory=/opt/ups-monitor
+
+# Optional: configuration file if we add support for it
+# Remove the leading dash (-) to require the file to exist
+EnvironmentFile=-/etc/ups-monitor/config.env
+
+# Restart policy: on-failure means restart only if process exits with non-zero
+# Better than 'always' which causes crash loops on startup errors
+Restart=on-failure
 RestartSec=5
+
+# Prevent infinite restart loops for startup failures
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# Resource limits for USB monitoring
+LimitNOFILE=16384
+
+# Security hardening: restrict service to minimal required privileges
+NoNewPrivileges=true
+
+# Filesystem protection
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+# Kernel protection
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# Capability and namespace restrictions
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictNamespaces=true
+RestrictRealtime=true
 
 [Install]
 WantedBy=multi-user.target
