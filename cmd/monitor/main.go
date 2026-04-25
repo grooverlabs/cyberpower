@@ -223,9 +223,38 @@ func getDeviceStatus(c fuego.ContextNoBody) (FullStatus, error) {
 	}
 	defer device.Close()
 
-	props, _ := device.GetProperties()
-	status, _ := device.GetStatus()
-	beeper, _ := device.GetBeeperStatus()
+	props, err := device.GetProperties()
+	if err != nil {
+		return FullStatus{}, fuego.NotFoundError{
+			Err:    err,
+			Detail: fmt.Sprintf("failed to read device properties: %v", err),
+		}
+	}
+	if props == nil {
+		return FullStatus{}, fuego.NotFoundError{
+			Detail: "device properties returned nil",
+		}
+	}
+
+	status, err := device.GetStatus()
+	if err != nil {
+		return FullStatus{}, fuego.NotFoundError{
+			Err:    err,
+			Detail: fmt.Sprintf("failed to read device status: %v", err),
+		}
+	}
+	if status == nil {
+		return FullStatus{}, fuego.NotFoundError{
+			Detail: "device status returned nil",
+		}
+	}
+
+	beeper, err := device.GetBeeperStatus()
+	if err != nil {
+		// Beeper status is less critical, so log warning but continue with default
+		log.Printf("warning: failed to get beeper status: %v\n", err)
+		beeper = 0
+	}
 
 	return FullStatus{
 		Properties: *props,

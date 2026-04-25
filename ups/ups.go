@@ -1,6 +1,7 @@
 package ups
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"strings"
@@ -192,17 +193,27 @@ func (u *UPS) GetStatus() (*Status, error) {
 	var buf []byte
 	var err error
 
+	// Use context with timeout to ensure goroutines are properly cleaned up
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	// Retry loop for reading the correct report
-	timeout := time.After(5 * time.Second)
 	for {
-		c := make(chan struct{}, 1)
+		// Channel to receive one result, buffered to prevent goroutine leak
+		resultCh := make(chan struct{}, 1)
 		go func() {
 			id, buf, err = u.device.GetInputReport()
-			c <- struct{}{}
+			select {
+			case resultCh <- struct{}{}:
+				// Result sent successfully
+			case <-ctx.Done():
+				// Context already cancelled, exit gracefully
+				return
+			}
 		}()
 
 		select {
-		case <-c:
+		case <-resultCh:
 			if err != nil {
 				return nil, fmt.Errorf("failed to get input report: %w", err)
 			}
@@ -210,7 +221,7 @@ func (u *UPS) GetStatus() (*Status, error) {
 				goto ParseReport
 			}
 			continue
-		case <-timeout:
+		case <-ctx.Done():
 			return nil, fmt.Errorf("timed out waiting for input report 0x08")
 		}
 	}

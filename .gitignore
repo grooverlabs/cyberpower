@@ -1,6 +1,7 @@
 # Binaries
 ups-cli
 ups-monitor
+bin
 *.exe
 *.dll
 *.so
