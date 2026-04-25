@@ -207,15 +207,18 @@ func (u *UPS) GetStatus() (*Status, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	var result inputReportResult
+	var runtimeSeconds uint16
+
 	// Retry loop for reading the correct report
 	for {
 		// Channel to receive one result, buffered to prevent goroutine leak
 		resultCh := make(chan inputReportResult, 1)
 		go func() {
 			id, buf, err := u.device.GetInputReport()
-			result := inputReportResult{id: id, buf: buf, err: err}
+			r := inputReportResult{id: id, buf: buf, err: err}
 			select {
-			case resultCh <- result:
+			case resultCh <- r:
 				// Result sent successfully
 			case <-ctx.Done():
 				// Context already cancelled, exit gracefully
@@ -224,52 +227,25 @@ func (u *UPS) GetStatus() (*Status, error) {
 		}()
 
 		select {
-		case result := <-resultCh:
-			if result.err != nil {
-				return nil, fmt.Errorf("failed to get input report: %w", result.err)
+		case res := <-resultCh:
+			if res.err != nil {
+				return nil, fmt.Errorf("failed to get input report: %w", res.err)
 			}
-			if result.id == 0x08 {
-				goto ParseReport
+			if res.id == 0x08 {
+				// Found the correct report
+				if len(res.buf) < 5 {
+					return nil, fmt.Errorf("input report 0x08 was too short (expected 5 bytes, got %d)", len(res.buf))
+				}
+				result = res
+				runtimeSeconds = binary.BigEndian.Uint16(res.buf[2:4])
+				break
 			}
 			continue
 		case <-ctx.Done():
 			return nil, fmt.Errorf("timed out waiting for input report 0x08")
 		}
+		break // Exit loop after finding correct report
 	}
-
-ParseReport:
-	// This label is reached with the buf from above - fetch the latest result
-	// Re-enter the loop to get the actual result data
-	resultCh := make(chan inputReportResult, 1)
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel2()
-	
-	go func() {
-		id, buf, err := u.device.GetInputReport()
-		result := inputReportResult{id: id, buf: buf, err: err}
-		select {
-		case resultCh <- result:
-		case <-ctx2.Done():
-			return
-		}
-	}()
-
-	var result inputReportResult
-	select {
-	case result = <-resultCh:
-	case <-ctx2.Done():
-		return nil, fmt.Errorf("failed to retrieve report data")
-	}
-
-	if result.err != nil {
-		return nil, fmt.Errorf("failed to get input report: %w", result.err)
-	}
-
-	if len(result.buf) < 5 {
-		return nil, fmt.Errorf("input report 0x08 was too short (expected 5 bytes, got %d)", len(result.buf))
-	}
-
-	runtimeSeconds := binary.BigEndian.Uint16(result.buf[2:4])
 
 	status := &Status{
 		BatteryCapacity:  int(result.buf[0]),
