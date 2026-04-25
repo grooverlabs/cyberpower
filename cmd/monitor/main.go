@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"sync"
 
 	"cyberpower/ups"
 
@@ -73,8 +72,6 @@ func main() {
 
 // UPSCollector implements the prometheus.Collector interface
 type UPSCollector struct {
-	mu sync.Mutex
-
 	// Descriptors
 	inputVoltage   *prometheus.Desc
 	outputVoltage  *prometheus.Desc
@@ -136,9 +133,8 @@ func (c *UPSCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (c *UPSCollector) Collect(ch chan<- prometheus.Metric) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+	// No mutex needed: descriptors are read-only after initialization
+	// Each device is loaded, read, and closed independently
 	devices, err := ups.List()
 	if err != nil {
 		log.Printf("Error scanning devices during collection: %v", err)
@@ -184,9 +180,6 @@ func (c *UPSCollector) Collect(ch chan<- prometheus.Metric) {
 var upsCollector *UPSCollector
 
 func listDevices(c fuego.ContextNoBody) ([]ups.Properties, error) {
-	upsCollector.mu.Lock()
-	defer upsCollector.mu.Unlock()
-
 	devices, err := ups.List()
 	if err != nil {
 		return nil, fuego.BadRequestError{Err: err, Detail: "Failed to scan for devices"}
@@ -213,9 +206,6 @@ type FullStatus struct {
 
 func getDeviceStatus(c fuego.ContextNoBody) (FullStatus, error) {
 	serial := c.PathParam("serial")
-
-	upsCollector.mu.Lock()
-	defer upsCollector.mu.Unlock()
 
 	device, err := ups.Load(serial)
 	if err != nil {
@@ -278,9 +268,6 @@ func runBatteryTest(c fuego.ContextWithBody[BatteryTestRequest]) (MessageRespons
 		return MessageResponse{}, err
 	}
 
-	upsCollector.mu.Lock()
-	defer upsCollector.mu.Unlock()
-
 	device, err := ups.Load(serial)
 	if err != nil {
 		return MessageResponse{}, fuego.NotFoundError{Err: err, Detail: "UPS not found"}
@@ -313,9 +300,6 @@ func setBeeper(c fuego.ContextWithBody[BeeperRequest]) (MessageResponse, error) 
 	if err != nil {
 		return MessageResponse{}, err
 	}
-
-	upsCollector.mu.Lock()
-	defer upsCollector.mu.Unlock()
 
 	device, err := ups.Load(serial)
 	if err != nil {
