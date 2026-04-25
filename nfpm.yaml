@@ -23,13 +23,13 @@ depends:
 
 contents:
   # CLI binary
-  - src: ./bin/ups-cli-pkg
+  - src: ./dist/ups-cli-pkg
     dst: /usr/bin/ups-cli
     file_info:
       mode: 0755
 
   # Monitor service binary
-  - src: ./bin/ups-monitor-pkg
+  - src: ./dist/ups-monitor-pkg
     dst: /usr/bin/ups-monitor
     file_info:
       mode: 0755

@@ -5,7 +5,7 @@ MONITOR_BINARY=ups-monitor
 # Directories
 CLI_DIR=./cmd/cli
 MONITOR_DIR=./cmd/monitor
-BUILD_DIR=bin
+BUILD_DIR=dist
 
 # Go parameters
 GOCMD=go
@@ -56,4 +56,4 @@ check:
 
 # Remove build artifacts
 clean:
-	rm -rf $(BUILD_DIR) *.deb
+	rm -rf $(BUILD_DIR)
