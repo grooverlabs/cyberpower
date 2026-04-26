@@ -17,7 +17,7 @@ ARCH ?= $(shell go env GOARCH)
 OS ?= $(shell go env GOOS)
 VERSION ?= 0.0.1
 
-.PHONY: all build clean test check package help generate
+.PHONY: all build clean test check package help generate tailwind tailwind-watch tools-check
 
 help:
 	@echo "Usage:"
@@ -25,20 +25,38 @@ help:
 	@echo "  make build ARCH=arm64    - Cross-compile for ARM64"
 	@echo "  make build ARCH=amd64    - Cross-compile for AMD64"
 	@echo "  make package ARCH=arm64  - Build .deb package (implies build)"
-	@echo "  make generate            - Run templ generate for views"
+	@echo "  make generate            - Run tailwind + templ generate"
+	@echo "  make tailwind            - Compile assets/static/css/app.src.css"
+	@echo "  make tailwind-watch      - Watch and recompile CSS on changes"
 	@echo "  make test                - Run go tests"
 	@echo "  make check               - Run go vet"
-	@echo "  make clean               - Remove build artifacts (incl. generated views)"
+	@echo "  make clean               - Remove build artifacts (incl. generated views/CSS)"
 
 # Default target
 all: build
 
-# Generate templ views. Prints a friendly hint if templ isn't installed.
-generate:
+# Verify required external tools are installed.
+tools-check:
 	@command -v templ >/dev/null 2>&1 || { \
 	  echo "error: templ CLI not found"; \
 	  echo "install with: go install github.com/a-h/templ/cmd/templ@latest"; \
 	  exit 1; }
+	@command -v tailwindcss >/dev/null 2>&1 || { \
+	  echo "error: tailwindcss CLI not found"; \
+	  echo "download standalone: https://github.com/tailwindlabs/tailwindcss/releases"; \
+	  exit 1; }
+
+# Compile Tailwind CSS once.
+tailwind: tools-check
+	tailwindcss -i assets/static/css/app.src.css -o assets/static/css/app.css --minify
+
+# Watch mode for local development (use alongside 'go run .').
+tailwind-watch:
+	tailwindcss -i assets/static/css/app.src.css -o assets/static/css/app.css --watch
+
+# Generate everything that goes into the build: CSS first (so templ
+# components can reference utility classes that exist), then templ.
+generate: tailwind
 	templ generate ./...
 
 # Build for specified architecture (or native if ARCH not set)
@@ -66,3 +84,4 @@ check:
 clean:
 	rm -rf $(BUILD_DIR)
 	find views -name '*_templ.go' -delete 2>/dev/null || true
+	rm -f assets/static/css/app.css

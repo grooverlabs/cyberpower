@@ -1,13 +1,12 @@
 package main
 
 import (
-	"embed"
-	"io/fs"
 	"log"
 	"net/http"
 	"net/url"
 	"sort"
 
+	"cyberpower/assets"
 	"cyberpower/gateways"
 	"cyberpower/views"
 
@@ -15,23 +14,14 @@ import (
 	"github.com/go-fuego/fuego"
 )
 
-// staticFS holds the embedded CSS / asset files served at /static/.
-//
-//go:embed static
-var staticFS embed.FS
-
 // registerWebRoutes hangs the HTML dashboard, partials, and form-POST
 // handlers off the Fuego server. The JSON API is registered separately
 // under /api/ in main().
 func registerWebRoutes(s *fuego.Server) {
-	// Static assets. The embed FS keeps the "static/" prefix, so we use
-	// fs.Sub to expose the contents directly under /static/.
-	sub, err := fs.Sub(staticFS, "static")
-	if err != nil {
-		log.Fatalf("static fs: %v", err)
-	}
+	// Static assets come from the assets package's embedded FS — same
+	// pattern as Triton, so main and any future tests share the bytes.
 	fuego.GetStd(s, "/static/", func(w http.ResponseWriter, r *http.Request) {
-		http.StripPrefix("/static/", http.FileServer(http.FS(sub))).ServeHTTP(w, r)
+		http.StripPrefix("/static/", http.FileServer(http.FS(assets.Static()))).ServeHTTP(w, r)
 	})
 
 	fuego.GetStd(s, "/", handleDashboard)

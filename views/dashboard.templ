@@ -7,7 +7,7 @@ import (
 	"cyberpower/gateways"
 )
 
-// statusClass returns the CSS class for a UPS state string.
+// statusClass returns the badge component class for a UPS state.
 func statusClass(snap gateways.CachedStatus) string {
 	if snap.Err != "" {
 		return "status status-error"
@@ -43,9 +43,9 @@ func ageLabel(t time.Time) string {
 // Dashboard is the full root page: layout + auto-refreshing list.
 templ Dashboard(snaps []gateways.CachedStatus) {
 	@Layout("Dashboard") {
-		<section class="dashboard">
-			<div class="dashboard-header">
-				<h1>UPS Devices</h1>
+		<section>
+			<div class="flex items-center justify-between mb-4">
+				<h1 class="text-xl font-semibold">UPS Devices</h1>
 				<button
 					class="btn"
 					hx-get="/partials/devices"
@@ -68,9 +68,9 @@ templ Dashboard(snaps []gateways.CachedStatus) {
 // DeviceList is also rendered standalone for HTMX swaps.
 templ DeviceList(snaps []gateways.CachedStatus) {
 	if len(snaps) == 0 {
-		<p class="empty">No UPS devices detected. The poller refreshes every 15 seconds.</p>
+		<p class="text-muted text-sm">No UPS devices detected. The poller refreshes every 15 seconds.</p>
 	} else {
-		<div class="grid">
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 			for _, snap := range snaps {
 				@DeviceCard(snap)
 			}
@@ -79,22 +79,23 @@ templ DeviceList(snaps []gateways.CachedStatus) {
 }
 
 templ DeviceCard(snap gateways.CachedStatus) {
-	<a class="card" href={ templ.SafeURL("/device/" + snap.Properties.SerialNumber) }>
-		<div class="card-head">
-			<h2>{ snap.Properties.ModelName }</h2>
+	<a class="block bg-panel border border-border rounded p-4 hover:bg-panel-2 transition-colors no-underline text-text" href={ templ.SafeURL("/device/" + snap.Properties.SerialNumber) }>
+		<div class="flex items-start justify-between mb-3 gap-2">
+			<h2 class="text-base font-semibold leading-tight">{ snap.Properties.ModelName }</h2>
 			<span class={ statusClass(snap) }>{ statusLabel(snap) }</span>
 		</div>
-		<dl class="card-body">
-			<dt>Serial</dt><dd>{ snap.Properties.SerialNumber }</dd>
-			<dt>Battery</dt><dd>{ fmt.Sprintf("%d%%", snap.Status.BatteryCapacity) }</dd>
-			<dt>Runtime</dt><dd>{ fmt.Sprintf("%d min", snap.Status.RemainingRuntime) }</dd>
-			<dt>Load</dt><dd>{ fmt.Sprintf("%dW (%d%%)", snap.Status.Load, snap.Status.LoadPercentage) }</dd>
-			<dt>Input</dt><dd>{ fmt.Sprintf("%dV", snap.Status.UtilityVoltage) }</dd>
-			<dt>Output</dt><dd>{ fmt.Sprintf("%dV", snap.Status.OutputVoltage) }</dd>
+		<dl class="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-sm">
+			<dt class="text-muted">Serial</dt><dd>{ snap.Properties.SerialNumber }</dd>
+			<dt class="text-muted">Power</dt><dd>{ snap.Status.PowerSupplyBy }</dd>
+			<dt class="text-muted">Battery</dt><dd>{ fmt.Sprintf("%d%%", snap.Status.BatteryCapacity) }</dd>
+			<dt class="text-muted">Runtime</dt><dd>{ fmt.Sprintf("%d min", snap.Status.RemainingRuntime) }</dd>
+			<dt class="text-muted">Load</dt><dd>{ fmt.Sprintf("%dW (%d%%)", snap.Status.Load, snap.Status.LoadPercentage) }</dd>
+			<dt class="text-muted">Input</dt><dd>{ fmt.Sprintf("%dV", snap.Status.UtilityVoltage) }</dd>
+			<dt class="text-muted">Output</dt><dd>{ fmt.Sprintf("%dV", snap.Status.OutputVoltage) }</dd>
 		</dl>
 		if snap.Err != "" {
-			<p class="card-err">{ snap.Err }</p>
+			<p class="mt-3 text-low text-xs">{ snap.Err }</p>
 		}
-		<p class="card-foot">Updated { ageLabel(snap.LastUpdated) }</p>
+		<p class="mt-3 text-muted text-xs">Updated { ageLabel(snap.LastUpdated) }</p>
 	</a>
 }

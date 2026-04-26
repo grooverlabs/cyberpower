@@ -7,19 +7,19 @@ templ Layout(title string) {
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<title>{ title } — CyberPower UPS Monitor</title>
-			<link rel="stylesheet" href="/static/css/main.css"/>
+			<link rel="stylesheet" href="/static/css/app.css"/>
 			<script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2" crossorigin="anonymous"></script>
 		</head>
-		<body>
-			<header class="topbar">
-				<a href="/" class="brand">CyberPower UPS Monitor</a>
-				<nav>
-					<a href="/">Dashboard</a>
-					<a href="/swagger" target="_blank">API</a>
-					<a href="/metrics" target="_blank">Metrics</a>
+		<body class="min-h-screen">
+			<header class="flex items-center justify-between px-6 py-3 bg-panel border-b border-border">
+				<a href="/" class="font-semibold text-base text-text">CyberPower UPS Monitor</a>
+				<nav class="flex gap-4 text-sm text-muted">
+					<a href="/" class="hover:text-text">Dashboard</a>
+					<a href="/swagger" target="_blank" class="hover:text-text">API</a>
+					<a href="/metrics" target="_blank" class="hover:text-text">Metrics</a>
 				</nav>
 			</header>
-			<main>
+			<main class="max-w-6xl mx-auto px-6 py-6">
 				{ children... }
 			</main>
 		</body>

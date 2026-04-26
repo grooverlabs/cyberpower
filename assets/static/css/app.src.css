@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+/* CyberPower design tokens. Tailwind v4 reads @theme to generate utility
+   classes (bg-bg, text-muted, border-border, etc.). Dark dashboard
+   palette tuned for at-a-glance status reading. */
+@theme {
+  --color-bg:       #0f1419;
+  --color-panel:    #1a2028;
+  --color-panel-2:  #232b36;
+  --color-text:     #e6edf3;
+  --color-muted:    #8b949e;
+  --color-border:   #30363d;
+  --color-accent:   #2f81f7;
+  --color-accent-h: #4493f8;
+  --color-normal:   #2ea043;
+  --color-battery:  #d29922;
+  --color-low:      #f85149;
+  --color-error:    #6e7681;
+
+  --font-sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Global resets / body defaults. Most styling is done with Tailwind
+   utility classes directly in the templ components. */
+html, body { height: 100%; }
+body {
+  @apply font-sans bg-bg text-text antialiased;
+  margin: 0;
+}
+
+/* Component classes — used where utility chains would be repetitive
+   or hard to read. Mirrors Triton's approach of keeping pill/badge
+   styles centralised. */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center px-3 py-1.5 rounded text-sm font-medium
+           bg-accent text-white border border-transparent cursor-pointer
+           hover:bg-accent-h transition-colors;
+  }
+  .btn-secondary {
+    @apply bg-panel-2 text-text border-border hover:bg-panel;
+  }
+
+  .status {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+  }
+  .status-normal  { @apply bg-normal/20 text-normal; }
+  .status-battery { @apply bg-battery/20 text-battery; }
+  .status-low     { @apply bg-low/20 text-low; }
+  .status-error   { @apply bg-error/20 text-muted; }
+}

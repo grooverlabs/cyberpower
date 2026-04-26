@@ -16,36 +16,41 @@ func beeperLabel(code int) string {
 // Device renders the per-device detail page.
 templ Device(snap gateways.CachedStatus, flash string) {
 	@Layout(snap.Properties.ModelName) {
-		<section class="detail">
-			<a href="/" class="back">← Back to dashboard</a>
-			<header class="detail-head">
-				<h1>{ snap.Properties.ModelName }</h1>
+		<section>
+			<a href="/" class="text-muted hover:text-text text-sm">← Back to dashboard</a>
+			<header class="flex items-center justify-between mt-3 mb-4 gap-2">
+				<h1 class="text-xl font-semibold">{ snap.Properties.ModelName }</h1>
 				<span class={ statusClass(snap) }>{ statusLabel(snap) }</span>
 			</header>
 			if flash != "" {
-				<div class="flash">{ flash }</div>
+				<div class="mb-4 p-3 rounded bg-panel border border-accent/40 text-sm">{ flash }</div>
 			}
 			<div
 				id="device-body"
+				class="bg-panel border border-border rounded p-4"
 				hx-get={ "/partials/device/" + snap.Properties.SerialNumber }
 				hx-trigger="every 15s"
 				hx-swap="innerHTML"
 			>
 				@DeviceBody(snap)
 			</div>
-			<section class="controls">
-				<h2>Battery Test</h2>
-				<form method="post" action={ templ.SafeURL("/device/" + snap.Properties.SerialNumber + "/battery-test") } class="row">
-					<button name="action" value="quick" class="btn">Quick Test</button>
-					<button name="action" value="deep" class="btn">Deep Test</button>
-					<button name="action" value="stop" class="btn btn-secondary">Stop</button>
-				</form>
-				<h2>Beeper</h2>
-				<form method="post" action={ templ.SafeURL("/device/" + snap.Properties.SerialNumber + "/beeper") } class="row">
-					<button name="enable" value="true" class="btn">Enable</button>
-					<button name="enable" value="false" class="btn btn-secondary">Disable</button>
-					<span class="hint">Currently: { beeperLabel(snap.BeeperCode) }</span>
-				</form>
+			<section class="mt-6 space-y-4">
+				<div>
+					<h2 class="text-base font-semibold mb-2">Battery Test</h2>
+					<form method="post" action={ templ.SafeURL("/device/" + snap.Properties.SerialNumber + "/battery-test") } class="flex flex-wrap gap-2 items-center">
+						<button name="action" value="quick" class="btn">Quick Test</button>
+						<button name="action" value="deep" class="btn">Deep Test</button>
+						<button name="action" value="stop" class="btn btn-secondary">Stop</button>
+					</form>
+				</div>
+				<div>
+					<h2 class="text-base font-semibold mb-2">Beeper</h2>
+					<form method="post" action={ templ.SafeURL("/device/" + snap.Properties.SerialNumber + "/beeper") } class="flex flex-wrap gap-2 items-center">
+						<button name="enable" value="true" class="btn">Enable</button>
+						<button name="enable" value="false" class="btn btn-secondary">Disable</button>
+						<span class="text-muted text-sm">Currently: { beeperLabel(snap.BeeperCode) }</span>
+					</form>
+				</div>
 			</section>
 		</section>
 	}
@@ -53,22 +58,22 @@ templ Device(snap gateways.CachedStatus, flash string) {
 
 // DeviceBody is the auto-refreshing portion of the detail view.
 templ DeviceBody(snap gateways.CachedStatus) {
-	<dl class="detail-grid">
-		<dt>Serial</dt><dd>{ snap.Properties.SerialNumber }</dd>
-		<dt>Firmware</dt><dd>{ snap.Properties.FirmwareNumber }</dd>
-		<dt>Rated Power</dt><dd>{ fmt.Sprintf("%d VA", snap.Properties.NominalPowerVA) }</dd>
-		<dt>Rated Voltage</dt><dd>{ snap.Properties.RatingVoltage }</dd>
-		<dt>Battery Charge</dt><dd>{ fmt.Sprintf("%d%%", snap.Status.BatteryCapacity) }</dd>
-		<dt>Runtime Remaining</dt><dd>{ fmt.Sprintf("%d min", snap.Status.RemainingRuntime) }</dd>
-		<dt>Load</dt><dd>{ fmt.Sprintf("%d W (%d%%)", snap.Status.Load, snap.Status.LoadPercentage) }</dd>
-		<dt>Input Voltage</dt><dd>{ fmt.Sprintf("%d V", snap.Status.UtilityVoltage) }</dd>
-		<dt>Output Voltage</dt><dd>{ fmt.Sprintf("%d V", snap.Status.OutputVoltage) }</dd>
-		<dt>Input Frequency</dt><dd>{ fmt.Sprintf("%.1f Hz", snap.Status.InputFrequency) }</dd>
-		<dt>Power Source</dt><dd>{ snap.Status.PowerSupplyBy }</dd>
-		<dt>Last Test Result</dt><dd>{ snap.Status.TestResult }</dd>
-		<dt>Updated</dt><dd>{ ageLabel(snap.LastUpdated) }</dd>
+	<dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
+		<dt class="text-muted">Serial</dt><dd>{ snap.Properties.SerialNumber }</dd>
+		<dt class="text-muted">Firmware</dt><dd>{ snap.Properties.FirmwareNumber }</dd>
+		<dt class="text-muted">Rated Power</dt><dd>{ fmt.Sprintf("%d VA", snap.Properties.NominalPowerVA) }</dd>
+		<dt class="text-muted">Rated Voltage</dt><dd>{ snap.Properties.RatingVoltage }</dd>
+		<dt class="text-muted">Battery Charge</dt><dd>{ fmt.Sprintf("%d%%", snap.Status.BatteryCapacity) }</dd>
+		<dt class="text-muted">Runtime Remaining</dt><dd>{ fmt.Sprintf("%d min", snap.Status.RemainingRuntime) }</dd>
+		<dt class="text-muted">Load</dt><dd>{ fmt.Sprintf("%d W (%d%%)", snap.Status.Load, snap.Status.LoadPercentage) }</dd>
+		<dt class="text-muted">Input Voltage</dt><dd>{ fmt.Sprintf("%d V", snap.Status.UtilityVoltage) }</dd>
+		<dt class="text-muted">Output Voltage</dt><dd>{ fmt.Sprintf("%d V", snap.Status.OutputVoltage) }</dd>
+		<dt class="text-muted">Input Frequency</dt><dd>{ fmt.Sprintf("%.1f Hz", snap.Status.InputFrequency) }</dd>
+		<dt class="text-muted">Power Source</dt><dd>{ snap.Status.PowerSupplyBy }</dd>
+		<dt class="text-muted">Last Test Result</dt><dd>{ snap.Status.TestResult }</dd>
+		<dt class="text-muted">Updated</dt><dd>{ ageLabel(snap.LastUpdated) }</dd>
 	</dl>
 	if snap.Err != "" {
-		<p class="card-err">{ snap.Err }</p>
+		<p class="mt-3 text-low text-xs">{ snap.Err }</p>
 	}
 }
