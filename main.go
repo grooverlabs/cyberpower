@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"cyberpower/gateways"
 	"cyberpower/ups"
@@ -77,9 +79,40 @@ func main() {
 	fmt.Println("Swagger UI available at http://0.0.0.0:9999/swagger")
 	fmt.Println("Metrics available at http://0.0.0.0:9999/metrics")
 
-	if err := s.Run(); err != nil {
-		log.Fatal(err)
+	// Run the HTTP server in a goroutine so we can wait on ctx for a
+	// signal and shut everything down cleanly. Without this, fuego's
+	// blocking Run() prevents Ctrl-C from triggering shutdown.
+	serverErr := make(chan error, 1)
+	go func() {
+		if err := s.Run(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErr <- err
+			return
+		}
+		serverErr <- nil
+	}()
+
+	select {
+	case err := <-serverErr:
+		if err != nil {
+			log.Fatalf("server error: %v", err)
+		}
+	case <-ctx.Done():
+		log.Println("shutdown signal received")
 	}
+
+	// Stop accepting new requests; give in-flight requests up to 10s.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := s.Shutdown(shutdownCtx); err != nil {
+		log.Printf("http shutdown: %v", err)
+	}
+
+	// ctx is already cancelled (or about to be on server-error exit);
+	// stop() ensures the poller goroutine sees Done and exits, then we
+	// block until it has fully drained its current device read.
+	stop()
+	gateway.Wait()
+	log.Println("shutdown complete")
 }
 
 // ---------------------------------------------------------------------------
