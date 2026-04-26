@@ -1,0 +1,74 @@
+package views
+
+import (
+	"fmt"
+
+	"cyberpower/gateways"
+)
+
+func beeperLabel(code int) string {
+	if code == 1 {
+		return "Enabled"
+	}
+	return "Disabled"
+}
+
+// Device renders the per-device detail page.
+templ Device(snap gateways.CachedStatus, flash string) {
+	@Layout(snap.Properties.ModelName) {
+		<section class="detail">
+			<a href="/" class="back">← Back to dashboard</a>
+			<header class="detail-head">
+				<h1>{ snap.Properties.ModelName }</h1>
+				<span class={ statusClass(snap) }>{ statusLabel(snap) }</span>
+			</header>
+			if flash != "" {
+				<div class="flash">{ flash }</div>
+			}
+			<div
+				id="device-body"
+				hx-get={ "/partials/device/" + snap.Properties.SerialNumber }
+				hx-trigger="every 15s"
+				hx-swap="innerHTML"
+			>
+				@DeviceBody(snap)
+			</div>
+			<section class="controls">
+				<h2>Battery Test</h2>
+				<form method="post" action={ templ.SafeURL("/device/" + snap.Properties.SerialNumber + "/battery-test") } class="row">
+					<button name="action" value="quick" class="btn">Quick Test</button>
+					<button name="action" value="deep" class="btn">Deep Test</button>
+					<button name="action" value="stop" class="btn btn-secondary">Stop</button>
+				</form>
+				<h2>Beeper</h2>
+				<form method="post" action={ templ.SafeURL("/device/" + snap.Properties.SerialNumber + "/beeper") } class="row">
+					<button name="enable" value="true" class="btn">Enable</button>
+					<button name="enable" value="false" class="btn btn-secondary">Disable</button>
+					<span class="hint">Currently: { beeperLabel(snap.BeeperCode) }</span>
+				</form>
+			</section>
+		</section>
+	}
+}
+
+// DeviceBody is the auto-refreshing portion of the detail view.
+templ DeviceBody(snap gateways.CachedStatus) {
+	<dl class="detail-grid">
+		<dt>Serial</dt><dd>{ snap.Properties.SerialNumber }</dd>
+		<dt>Firmware</dt><dd>{ snap.Properties.FirmwareNumber }</dd>
+		<dt>Rated Power</dt><dd>{ fmt.Sprintf("%d VA", snap.Properties.NominalPowerVA) }</dd>
+		<dt>Rated Voltage</dt><dd>{ snap.Properties.RatingVoltage }</dd>
+		<dt>Battery Charge</dt><dd>{ fmt.Sprintf("%d%%", snap.Status.BatteryCapacity) }</dd>
+		<dt>Runtime Remaining</dt><dd>{ fmt.Sprintf("%d min", snap.Status.RemainingRuntime) }</dd>
+		<dt>Load</dt><dd>{ fmt.Sprintf("%d W (%d%%)", snap.Status.Load, snap.Status.LoadPercentage) }</dd>
+		<dt>Input Voltage</dt><dd>{ fmt.Sprintf("%d V", snap.Status.UtilityVoltage) }</dd>
+		<dt>Output Voltage</dt><dd>{ fmt.Sprintf("%d V", snap.Status.OutputVoltage) }</dd>
+		<dt>Input Frequency</dt><dd>{ fmt.Sprintf("%.1f Hz", snap.Status.InputFrequency) }</dd>
+		<dt>Power Source</dt><dd>{ snap.Status.PowerSupplyBy }</dd>
+		<dt>Last Test Result</dt><dd>{ snap.Status.TestResult }</dd>
+		<dt>Updated</dt><dd>{ ageLabel(snap.LastUpdated) }</dd>
+	</dl>
+	if snap.Err != "" {
+		<p class="card-err">{ snap.Err }</p>
+	}
+}

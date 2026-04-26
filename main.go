@@ -70,6 +70,9 @@ func main() {
 	fuego.Post(s, "/api/ups/{serial}/battery-test", runBatteryTest)
 	fuego.Post(s, "/api/ups/{serial}/beeper", setBeeper)
 
+	// Web dashboard, partials and form-POST endpoints.
+	registerWebRoutes(s)
+
 	fmt.Println("Server starting on http://0.0.0.0:9999")
 	fmt.Println("Swagger UI available at http://0.0.0.0:9999/swagger")
 	fmt.Println("Metrics available at http://0.0.0.0:9999/metrics")

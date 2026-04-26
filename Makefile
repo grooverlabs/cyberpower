@@ -17,23 +17,32 @@ ARCH ?= $(shell go env GOARCH)
 OS ?= $(shell go env GOOS)
 VERSION ?= 0.0.1
 
-.PHONY: all build clean test check package help
+.PHONY: all build clean test check package help generate
 
 help:
 	@echo "Usage:"
-	@echo "  make build               - Build for native platform"
+	@echo "  make build               - Build for native platform (runs generate first)"
 	@echo "  make build ARCH=arm64    - Cross-compile for ARM64"
 	@echo "  make build ARCH=amd64    - Cross-compile for AMD64"
 	@echo "  make package ARCH=arm64  - Build .deb package (implies build)"
+	@echo "  make generate            - Run templ generate for views"
 	@echo "  make test                - Run go tests"
 	@echo "  make check               - Run go vet"
-	@echo "  make clean               - Remove build artifacts"
+	@echo "  make clean               - Remove build artifacts (incl. generated views)"
 
 # Default target
 all: build
 
+# Generate templ views. Prints a friendly hint if templ isn't installed.
+generate:
+	@command -v templ >/dev/null 2>&1 || { \
+	  echo "error: templ CLI not found"; \
+	  echo "install with: go install github.com/a-h/templ/cmd/templ@latest"; \
+	  exit 1; }
+	templ generate ./...
+
 # Build for specified architecture (or native if ARCH not set)
-build:
+build: generate
 	mkdir -p $(BUILD_DIR)
 	GOOS=$(OS) GOARCH=$(ARCH) $(GOBUILD) -o $(BUILD_DIR)/$(MONITOR_BINARY)-$(ARCH) -v .
 	GOOS=$(OS) GOARCH=$(ARCH) $(GOBUILD) -o $(BUILD_DIR)/$(CLI_BINARY)-$(ARCH) -v $(CLI_DIR)
@@ -53,6 +62,7 @@ test:
 check:
 	go vet ./...
 
-# Remove build artifacts
+# Remove build artifacts and generated views
 clean:
 	rm -rf $(BUILD_DIR)
+	find views -name '*_templ.go' -delete 2>/dev/null || true

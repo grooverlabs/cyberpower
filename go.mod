@@ -5,6 +5,7 @@ go 1.25.6
 require rafaelmartins.com/p/usbhid v0.0.0-20260201162308-12aff85c336f
 
 require (
+	github.com/a-h/templ v0.3.1001 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/ebitengine/purego v0.9.1 // indirect

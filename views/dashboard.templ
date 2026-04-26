@@ -1,0 +1,100 @@
+package views
+
+import (
+	"fmt"
+	"time"
+
+	"cyberpower/gateways"
+)
+
+// statusClass returns the CSS class for a UPS state string.
+func statusClass(snap gateways.CachedStatus) string {
+	if snap.Err != "" {
+		return "status status-error"
+	}
+	switch snap.Status.State {
+	case "On Battery":
+		return "status status-battery"
+	case "Low Battery":
+		return "status status-low"
+	default:
+		return "status status-normal"
+	}
+}
+
+func statusLabel(snap gateways.CachedStatus) string {
+	if snap.Err != "" {
+		return "Error"
+	}
+	if snap.Status.State == "" {
+		return "Unknown"
+	}
+	return snap.Status.State
+}
+
+func ageLabel(t time.Time) string {
+	if t.IsZero() {
+		return "never"
+	}
+	d := time.Since(t).Round(time.Second)
+	return fmt.Sprintf("%s ago", d)
+}
+
+// Dashboard is the full root page: layout + auto-refreshing list.
+templ Dashboard(snaps []gateways.CachedStatus) {
+	@Layout("Dashboard") {
+		<section class="dashboard">
+			<div class="dashboard-header">
+				<h1>UPS Devices</h1>
+				<button
+					class="btn"
+					hx-get="/partials/devices"
+					hx-target="#device-list"
+					hx-swap="innerHTML"
+				>Refresh</button>
+			</div>
+			<div
+				id="device-list"
+				hx-get="/partials/devices"
+				hx-trigger="every 15s"
+				hx-swap="innerHTML"
+			>
+				@DeviceList(snaps)
+			</div>
+		</section>
+	}
+}
+
+// DeviceList is also rendered standalone for HTMX swaps.
+templ DeviceList(snaps []gateways.CachedStatus) {
+	if len(snaps) == 0 {
+		<p class="empty">No UPS devices detected. The poller refreshes every 15 seconds.</p>
+	} else {
+		<div class="grid">
+			for _, snap := range snaps {
+				@DeviceCard(snap)
+			}
+		</div>
+	}
+}
+
+templ DeviceCard(snap gateways.CachedStatus) {
+	<a class="card" href={ templ.SafeURL("/device/" + snap.Properties.SerialNumber) }>
+		<div class="card-head">
+			<h2>{ snap.Properties.ModelName }</h2>
+			<span class={ statusClass(snap) }>{ statusLabel(snap) }</span>
+		</div>
+		<dl class="card-body">
+			<dt>Serial</dt><dd>{ snap.Properties.SerialNumber }</dd>
+			<dt>Battery</dt><dd>{ fmt.Sprintf("%d%%", snap.Status.BatteryCapacity) }</dd>
+			<dt>Runtime</dt><dd>{ fmt.Sprintf("%d min", snap.Status.RemainingRuntime) }</dd>
+			<dt>Load</dt><dd>{ fmt.Sprintf("%dW (%d%%)", snap.Status.Load, snap.Status.LoadPercentage) }</dd>
+			<dt>Input</dt><dd>{ fmt.Sprintf("%dV", snap.Status.UtilityVoltage) }</dd>
+			<dt>Output</dt><dd>{ fmt.Sprintf("%dV", snap.Status.OutputVoltage) }</dd>
+		</dl>
+		if snap.Err != "" {
+			<p class="card-err">{ snap.Err }</p>
+		}
+		<p class="card-foot">Updated { ageLabel(snap.LastUpdated) }</p>
+	</a>
+}
