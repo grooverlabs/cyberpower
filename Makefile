@@ -3,8 +3,7 @@ CLI_BINARY=ups-cli
 MONITOR_BINARY=ups-monitor
 
 # Directories
-CLI_DIR=./cmd/cli
-MONITOR_DIR=./cmd/monitor
+CLI_DIR=./cmd/ups-cli
 BUILD_DIR=dist
 
 # Go parameters
@@ -36,8 +35,8 @@ all: build
 # Build for specified architecture (or native if ARCH not set)
 build:
 	mkdir -p $(BUILD_DIR)
-	GOOS=$(OS) GOARCH=$(ARCH) $(GOBUILD) -o $(BUILD_DIR)/$(CLI_BINARY)-$(ARCH) $(CLI_DIR)
-	GOOS=$(OS) GOARCH=$(ARCH) $(GOBUILD) -o $(BUILD_DIR)/$(MONITOR_BINARY)-$(ARCH) $(MONITOR_DIR)
+	GOOS=$(OS) GOARCH=$(ARCH) $(GOBUILD) -o $(BUILD_DIR)/$(MONITOR_BINARY)-$(ARCH) -v .
+	GOOS=$(OS) GOARCH=$(ARCH) $(GOBUILD) -o $(BUILD_DIR)/$(CLI_BINARY)-$(ARCH) -v $(CLI_DIR)
 
 # Build .deb package (requires nfpm)
 package: build

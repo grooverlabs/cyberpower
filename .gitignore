@@ -1,7 +1,8 @@
 # Binaries
 ups-cli
 ups-monitor
-dist
+dist/
+bin/             # Legacy build directory
 *.exe
 *.dll
 *.so
@@ -13,6 +14,7 @@ dist
 
 # Dependencies (local clones/submodules ignored in favor of go.mod)
 vendor/
+nfpm/            # nfpm vendor code
 
 # IDEs
 .vscode/
