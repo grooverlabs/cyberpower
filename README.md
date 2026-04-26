@@ -130,6 +130,33 @@ scrape_configs:
 A sample configuration is provided in `monitoring/prometheus/prometheus.yml`.
 
 ### Alerting
+
+#### Built-in SMS alerts (via Triton)
+
+The monitor can send SMS notifications directly when a UPS transitions
+between utility power and battery, using a Triton (`go/src/triton`) API
+key. Configure with three environment variables:
+
+| Variable                  | Description                                            |
+|---------------------------|--------------------------------------------------------|
+| `CYBERPOWER_TRITON_URL`   | Base URL of the Triton instance (e.g. `https://triton.example.com`) |
+| `CYBERPOWER_TRITON_TOKEN` | Bearer token issued by Triton (`tri_…`)                |
+| `CYBERPOWER_SMS_TO`       | Comma-separated `+E.164` recipients (e.g. `+15551234567,+15555550199`) |
+
+If any of these is unset the notifier is disabled silently and the rest
+of the service runs normally. Behavior:
+
+* Fires on `Utility ↔ Battery` transitions only (low-battery alerts go
+  through Prometheus below).
+* 30-second per-serial cooldown suppresses flapping power.
+* No retries — the service logs and continues if Triton is unreachable.
+* The first poll for each device is treated as a baseline (no alert)
+  so a service restart doesn't double-send.
+
+For the systemd unit, drop the variables in `/etc/cyberpower/env` and
+reference it via `EnvironmentFile=`.
+
+#### Prometheus alerts
 You can configure Prometheus to alert you when utility power is lost. A sample alert rule file is provided in `monitoring/prometheus/alerts.yml`.
 
 To use it, add the following to your `prometheus.yml`:

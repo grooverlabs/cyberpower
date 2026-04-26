@@ -38,6 +38,7 @@ func main() {
 	defer stop()
 
 	gateway = gateways.New(0) // 0 → DefaultPollInterval (15s)
+	gateway.SetNotifier(gateways.NewNotifier())
 	gateway.Start(ctx)
 
 	reg := prometheus.NewRegistry()

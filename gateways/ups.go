@@ -47,6 +47,7 @@ var ErrNotFound = errors.New("ups not found")
 // UPSGateway owns the device cache and serialises write operations.
 type UPSGateway struct {
 	interval time.Duration
+	notifier *Notifier
 
 	mu    sync.RWMutex
 	cache map[string]CachedStatus
@@ -56,6 +57,11 @@ type UPSGateway struct {
 	// device. A separate sync.Mutex protects the map itself.
 	deviceMuMu sync.Mutex
 	deviceMu   map[string]*sync.Mutex
+
+	// prevPowerBy stores the last observed PowerSupplyBy per serial so we
+	// can detect Utility ↔ Battery transitions and forward them to the
+	// notifier. Only mutated from the poller goroutine.
+	prevPowerBy map[string]string
 
 	stopOnce sync.Once
 	stopped  chan struct{}
@@ -68,11 +74,18 @@ func New(interval time.Duration) *UPSGateway {
 		interval = DefaultPollInterval
 	}
 	return &UPSGateway{
-		interval: interval,
-		cache:    make(map[string]CachedStatus),
-		deviceMu: make(map[string]*sync.Mutex),
-		stopped:  make(chan struct{}),
+		interval:    interval,
+		cache:       make(map[string]CachedStatus),
+		deviceMu:    make(map[string]*sync.Mutex),
+		prevPowerBy: make(map[string]string),
+		stopped:     make(chan struct{}),
 	}
+}
+
+// SetNotifier attaches a notifier so the poller can fire SMS alerts on
+// Utility ↔ Battery transitions. Pass nil (or never call) to disable.
+func (g *UPSGateway) SetNotifier(n *Notifier) {
+	g.notifier = n
 }
 
 // Start runs the first poll synchronously so the cache is non-empty before
@@ -129,6 +142,7 @@ func (g *UPSGateway) pollOnce() {
 	for serial := range g.cache {
 		if _, ok := seen[serial]; !ok {
 			delete(g.cache, serial)
+			delete(g.prevPowerBy, serial)
 		}
 	}
 	g.mu.Unlock()
@@ -174,7 +188,43 @@ func (g *UPSGateway) refreshDevice(u *ups.UPS) string {
 	g.cache[props.SerialNumber] = snap
 	g.mu.Unlock()
 
+	g.maybeNotify(snap)
+
 	return props.SerialNumber
+}
+
+// maybeNotify fires an SMS alert when a device's PowerSupplyBy changes
+// between Utility and Battery. The very first observation of a serial is
+// treated as a baseline (no alert) so a service restart while a UPS is
+// already on battery doesn't blast a duplicate notification. Only called
+// from the poller goroutine, so prevPowerBy needs no extra locking.
+func (g *UPSGateway) maybeNotify(snap CachedStatus) {
+	if snap.Err != "" {
+		// Skip on a partial read — we don't know the real state.
+		return
+	}
+	serial := snap.Properties.SerialNumber
+	newState := snap.Status.PowerSupplyBy
+	prev, seen := g.prevPowerBy[serial]
+	g.prevPowerBy[serial] = newState
+	if !seen {
+		return
+	}
+	if !IsAlertable(prev, newState) {
+		return
+	}
+	if g.notifier == nil {
+		log.Printf("notifier: %s transition %s → %s (alerts disabled)", serial, prev, newState)
+		return
+	}
+	g.notifier.Notify(context.Background(), PowerEvent{
+		Serial:     serial,
+		Model:      snap.Properties.ModelName,
+		OldState:   prev,
+		NewState:   newState,
+		BatteryPct: snap.Status.BatteryCapacity,
+		RuntimeMin: snap.Status.RemainingRuntime,
+	})
 }
 
 // lockFor returns the per-serial mutex, creating one on first use.
