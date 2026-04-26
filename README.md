@@ -1,81 +1,157 @@
 # CyberPower UPS Monitoring Tool (Go)
 
-A lightweight, standalone Go tool for monitoring and controlling CyberPower UPS devices (specifically verified on the `CP1500PFCLCDa` model) via USB HID.
+A lightweight Go tool for monitoring and controlling CyberPower UPS
+devices (verified on `CP1500PFCLCDa`) over USB HID. Ships two binaries:
 
-This tool provides real-time status (Voltage, Load, Battery), Beeper control, and Battery Test management without requiring the heavy `nut-server` daemon, although it pairs well with standard udev rules.
+* **`ups-cli`** — one-shot CLI for status, beeper, and battery-test commands.
+* **`ups-monitor`** — long-running service exposing a web dashboard,
+  JSON REST API, Prometheus metrics, and optional SMS alerts.
+
+It does not require `nut-server`; it talks directly to the device's HID
+interface via udev rules.
 
 ## Features
 
-*   **Real-time Monitoring:** Reads Input/Output Voltage, Battery %, Runtime, Load (Watts & %), and Status.
-*   **Beeper Control:** Enable or Disable the audible alarm (verified correct Report IDs).
-*   **Battery Testing:** Trigger Quick or Deep self-tests and Stop them safely.
-*   **Smart Status:** Detects "On Battery" state instantly via voltage readings even if firmware status bits are laggy.
+* **Real-time monitoring** of input/output voltage, battery %, runtime,
+  load (W & %), and overall state.
+* **Web dashboard** (`http://host:9999/`) — auto-refreshing list of all
+  attached UPS with an at-a-glance Power column, plus per-device detail
+  pages with battery-test and beeper controls (HTMX + Tailwind, no JS
+  build step required).
+* **REST API** under `/api/` with OpenAPI docs at `/swagger`.
+* **Prometheus metrics** at `/metrics`, ready to scrape.
+* **SMS alerts** on `Utility ↔ Battery` transitions via Triton (optional;
+  see [Alerting](#alerting)).
+* **Multi-device** — every attached UPS is enumerated and polled.
+* **Safe USB access** — a single shared poller serialises HID reads and
+  writes per-serial so the dashboard, API, and Prometheus can never race
+  on the bus.
+* **Beeper control** and **battery testing** (Quick / Deep / Stop).
+
+## Architecture
+
+```
+                   ┌────────────────────────────┐
+USB HID  ─────────►│  gateways.UPSGateway       │
+(per device)       │   • single 15 s poller     │
+                   │   • per-serial mutex map   │
+                   │   • in-memory cache        │
+                   └─────────┬──────────────────┘
+                             │   snapshots
+        ┌────────────────────┼─────────────────────┐
+        ▼                    ▼                     ▼
+   web dashboard       JSON /api/ups         /metrics scrape
+   (templ + HTMX)      (fuego + Swagger)     (Prometheus)
+                             │
+                             ▼  on transition
+                       gateways.Notifier ── POST → Triton (SMS)
+```
+
+All read paths consume cache snapshots; nothing else touches the USB bus
+directly. Writes (battery test, beeper) take the per-serial mutex so they
+never overlap with the poller or each other.
 
 ## Installation
 
-### From Source
-1.  **Clone the repository:**
-    ```bash
-    git clone <repository-url>
-    cd cyberpower
-    ```
+### Prerequisites (from-source builds only)
 
-2.  **Build the project:**
-    ```bash
-    make
-    ```
-    This will create the `ups-cli` tool and the `ups-monitor` service.
+The `make build` pipeline runs `tailwindcss` and `templ generate` before
+compiling. Install them once:
 
-### As a Debian Package
-The project includes an `nfpm` configuration to build a `.deb` package that automatically handles udev rules, user creation, and systemd service setup.
+```bash
+# Templ (Go template engine)
+go install github.com/a-h/templ/cmd/templ@latest
 
-1.  **Build the package:**
-    ```bash
-    make deb
-    ```
+# Tailwind CSS standalone CLI (no Node required)
+# https://github.com/tailwindlabs/tailwindcss/releases
+curl -sLo ~/.local/bin/tailwindcss \
+  https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64
+chmod +x ~/.local/bin/tailwindcss
+```
 
-2.  **Install the package:**
-    ```bash
-    sudo dpkg -i cyberpower-ups_*.deb
-    ```
+The generated `app.css` is committed, so plain `go build` works without
+the Tailwind CLI; only `make build` re-runs it.
 
-3.  **Remove the package:**
-    ```bash
-    sudo apt remove cyberpower-ups
-    # or
-    sudo dpkg -r cyberpower-ups
-    ```
+### From source
 
-## Setup (Manual)
-*Note: This is only required if you are not using the Debian package.*
+```bash
+git clone <repository-url>
+cd cyberpower
+make build                  # native architecture
+make build ARCH=arm64       # Raspberry Pi / 64-bit ARM
+make build ARCH=amd64       # Intel/AMD 64-bit
+```
 
-To access the USB device without `sudo`, add a udev rule:
+Binaries land in `dist/`:
 
-1.  **Create the rule file:**
-    ```bash
-    echo 'KERNEL=="hidraw*", ATTRS{idVendor}=="0764", ATTRS{idProduct}=="0601", GROUP="plugdev", MODE="0660"' | sudo tee /etc/udev/rules.d/99-cyberpower.rules
-    ```
+```
+dist/ups-cli-<arch>
+dist/ups-monitor-<arch>
+```
 
-2.  **Reload rules:**
-    ```bash
-    sudo udevadm control --reload-rules && sudo udevadm trigger
-    ```
+### As a Debian package
 
-3.  **Add user to group:**
-    ```bash
-    sudo usermod -aG plugdev $USER
-    ```
-    *(Log out and back in for this to take effect)*
+The repo ships an `nfpm.yaml` that produces a `.deb` containing the
+binaries, the systemd unit, the udev rule, and a dedicated
+`ups-monitor` service user.
+
+```bash
+make package ARCH=arm64     # or amd64
+sudo dpkg -i dist/cyberpower-ups_*.deb
+```
+
+To uninstall:
+
+```bash
+sudo apt remove cyberpower-ups
+# or
+sudo dpkg -r cyberpower-ups
+```
+
+## Setup (Manual, for `ups-cli` only)
+
+*Skip this section if you installed via the Debian package — it does
+all of this for you.*
+
+To access the USB device without `sudo`:
+
+1. **Create the udev rule:**
+
+   ```bash
+   echo 'KERNEL=="hidraw*", ATTRS{idVendor}=="0764", ATTRS{idProduct}=="0601", GROUP="plugdev", MODE="0660"' \
+     | sudo tee /etc/udev/rules.d/99-cyberpower.rules
+   ```
+
+2. **Reload rules:**
+
+   ```bash
+   sudo udevadm control --reload-rules && sudo udevadm trigger
+   ```
+
+3. **Add your user to `plugdev`:**
+
+   ```bash
+   sudo usermod -aG plugdev $USER
+   ```
+
+   *Log out and back in for this to take effect.*
 
 ## Usage
 
-### Monitor Status (Default)
-Simply run the tool to see the status of all connected devices.
+### `ups-cli` — one-shot CLI
+
 ```bash
-./ups-cli
+./ups-cli                        # show status of all attached UPS
+./ups-cli -list                  # list serial numbers and exit
+./ups-cli -target CXXJV2019877   # restrict to one device
+./ups-cli -beeper enable         # or disable
+./ups-cli -test quick            # 10-second self-test
+./ups-cli -test deep             # runs until battery is low
+./ups-cli -test stop             # abort a running test
 ```
 
-**Example Output:**
+**Example status output:**
+
 ```text
 Found 1 UPS device(s).
 
@@ -96,38 +172,48 @@ Status:
   Beeper: Enabled (Code: 2)
 ```
 
-### Control Commands
+### `ups-monitor` — service
 
-**Disable Beeper:**
+Run the binary directly (or via the systemd unit installed by the deb):
+
 ```bash
-./ups-cli -beeper disable
+./ups-monitor
+# Server starting on http://0.0.0.0:9999
+# Swagger UI available at http://0.0.0.0:9999/swagger
+# Metrics available at http://0.0.0.0:9999/metrics
 ```
 
-**Enable Beeper:**
-```bash
-./ups-cli -beeper enable
-```
+Routes:
 
-**Run Battery Test:**
-```bash
-./ups-cli -test quick   # 10-second test
-./ups-cli -test deep    # Runs until battery is low
-./ups-cli -test stop    # Abort running test
-```
+| Path                              | Description                                           |
+|-----------------------------------|-------------------------------------------------------|
+| `/`                               | HTML dashboard (auto-refreshes every 15 s)            |
+| `/device/{serial}`                | Per-device detail page with controls                  |
+| `/partials/devices`               | HTMX partial: device list                             |
+| `/partials/device/{serial}`       | HTMX partial: one device's body                       |
+| `/api/ups`                        | JSON list of all cached snapshots                     |
+| `/api/ups/{serial}`               | JSON snapshot for one device                          |
+| `/api/ups/{serial}/battery-test`  | POST — trigger or stop a self-test                    |
+| `/api/ups/{serial}/beeper`        | POST — enable/disable beeper                          |
+| `/swagger`                        | OpenAPI documentation                                 |
+| `/metrics`                        | Prometheus exposition format                          |
+| `/static/css/app.css`             | Embedded stylesheet                                   |
+
+The service shuts down cleanly on `SIGINT` or `SIGTERM`: in-flight HTTP
+requests are drained for up to 10 s before exit.
 
 ## Monitoring with Prometheus & Grafana
 
-The `ups-monitor` service exports standard Prometheus metrics on port `9999` at the `/metrics` endpoint.
+`/metrics` exposes standard Prometheus metrics. Scrape config:
 
-### Prometheus Configuration
-To scrape metrics, add the following to your `prometheus.yml`:
 ```yaml
 scrape_configs:
   - job_name: 'cyberpower-ups'
     static_configs:
       - targets: ['<your-ups-host>:9999']
 ```
-A sample configuration is provided in `monitoring/prometheus/prometheus.yml`.
+
+A sample is in `monitoring/prometheus/prometheus.yml`.
 
 ### Alerting
 
@@ -144,7 +230,7 @@ key. Configure with three environment variables:
 | `CYBERPOWER_SMS_TO`       | Comma-separated `+E.164` recipients (e.g. `+15551234567,+15555550199`) |
 
 If any of these is unset the notifier is disabled silently and the rest
-of the service runs normally. Behavior:
+of the service runs normally. Behaviour:
 
 * Fires on `Utility ↔ Battery` transitions only (low-battery alerts go
   through Prometheus below).
@@ -153,21 +239,24 @@ of the service runs normally. Behavior:
 * The first poll for each device is treated as a baseline (no alert)
   so a service restart doesn't double-send.
 
-For the systemd unit, drop the variables in `/etc/cyberpower/env` and
-reference it via `EnvironmentFile=`.
+For the systemd unit, drop the variables in
+`/etc/ups-monitor/config.env` (the path the unit's `EnvironmentFile=`
+already points at).
 
 #### Prometheus alerts
-You can configure Prometheus to alert you when utility power is lost. A sample alert rule file is provided in `monitoring/prometheus/alerts.yml`.
 
-To use it, add the following to your `prometheus.yml`:
+You can configure Prometheus to alert when utility power is lost. A
+sample rule file is in `monitoring/prometheus/alerts.yml`:
+
 ```yaml
 rule_files:
   - "alerts.yml"
 ```
 
 The provided alerts cover:
-*   **UPSOnBattery**: Triggers when `ups_status_code > 0` (Utility power lost).
-*   **UPSLowBattery**: Triggers when `ups_status_code == 2` (Critical battery level).
+
+* **UPSOnBattery** — `ups_status_code > 0` (utility power lost).
+* **UPSLowBattery** — `ups_status_code == 2` (critical battery level).
 
 ### Grafana Dashboard
 A pre-configured Grafana dashboard is available in `monitoring/grafana/dashboard.json`.
