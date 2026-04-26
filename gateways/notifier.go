@@ -77,6 +77,41 @@ func NewNotifier() *Notifier {
 	}
 }
 
+// TestSend dispatches a fixed test SMS to all configured recipients,
+// bypassing the per-serial cooldown. Returns an error so the caller
+// (typically the web UI) can surface the result. Safe to call when n
+// is nil — returns a sentinel error.
+func (n *Notifier) TestSend(ctx context.Context) error {
+	if n == nil {
+		return fmt.Errorf("SMS alerts disabled (set CYBERPOWER_TRITON_URL, CYBERPOWER_TRITON_TOKEN, CYBERPOWER_SMS_TO)")
+	}
+	body := "[CyberPower] Test SMS from ups-monitor — alerts are working."
+	idem := fmt.Sprintf("cyberpower-test-%d", time.Now().UnixNano())
+	payload, err := json.Marshal(buildRequest(idem, body, n.recipients, PowerEvent{Serial: "test"}))
+	if err != nil {
+		return fmt.Errorf("marshal: %w", err)
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, n.baseURL+"/notifications", bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+n.token)
+	resp, err := n.httpClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("post: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("triton returned HTTP %d", resp.StatusCode)
+	}
+	log.Printf("notifier: test SMS sent to %d recipient(s)", len(n.recipients))
+	return nil
+}
+
+// Enabled reports whether the notifier is configured to send. nil-safe.
+func (n *Notifier) Enabled() bool { return n != nil }
+
 // Notify dispatches an SMS for one transition. Safe to call from the
 // poller goroutine; HTTP work is done synchronously but bounded by the
 // 10 s client timeout. Errors are logged; callers ignore the return.

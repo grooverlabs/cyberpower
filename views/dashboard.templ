@@ -41,18 +41,32 @@ func ageLabel(t time.Time) string {
 }
 
 // Dashboard is the full root page: layout + auto-refreshing list.
-templ Dashboard(snaps []gateways.CachedStatus) {
+templ Dashboard(snaps []gateways.CachedStatus, flash string, smsEnabled bool) {
 	@Layout("Dashboard") {
 		<section>
-			<div class="flex items-center justify-between mb-4">
+			<div class="flex items-center justify-between mb-4 gap-2 flex-wrap">
 				<h1 class="text-xl font-semibold">UPS Devices</h1>
-				<button
-					class="btn"
-					hx-get="/partials/devices"
-					hx-target="#device-list"
-					hx-swap="innerHTML"
-				>Refresh</button>
+				<div class="flex items-center gap-2">
+					<form method="post" action="/alerts/test" class="flex items-center gap-2">
+						if smsEnabled {
+							<span class="text-muted text-xs">SMS alerts: enabled</span>
+							<button type="submit" class="btn">Test SMS</button>
+						} else {
+							<span class="text-muted text-xs">SMS alerts: disabled</span>
+							<button type="submit" class="btn opacity-60" disabled title="Set CYBERPOWER_TRITON_URL/TOKEN/SMS_TO to enable">Test SMS</button>
+						}
+					</form>
+					<button
+						class="btn"
+						hx-get="/partials/devices"
+						hx-target="#device-list"
+						hx-swap="innerHTML"
+					>Refresh</button>
+				</div>
 			</div>
+			if flash != "" {
+				<div class="mb-4 p-3 rounded bg-panel border border-accent/40 text-sm">{ flash }</div>
+			}
 			<div
 				id="device-list"
 				hx-get="/partials/devices"

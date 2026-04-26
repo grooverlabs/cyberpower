@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"net/url"
 	"sort"
+	"time"
 
 	"cyberpower/assets"
 	"cyberpower/gateways"
@@ -30,6 +32,7 @@ func registerWebRoutes(s *fuego.Server) {
 	fuego.GetStd(s, "/partials/device/{serial}", handleDevicePartial)
 	fuego.PostStd(s, "/device/{serial}/battery-test", handleBatteryTestForm)
 	fuego.PostStd(s, "/device/{serial}/beeper", handleBeeperForm)
+	fuego.PostStd(s, "/alerts/test", handleAlertsTestForm)
 }
 
 // sortedSnapshots returns cache snapshots sorted by serial for stable
@@ -43,7 +46,8 @@ func sortedSnapshots() []gateways.CachedStatus {
 }
 
 func handleDashboard(w http.ResponseWriter, r *http.Request) {
-	render(w, r, views.Dashboard(sortedSnapshots()))
+	flash := r.URL.Query().Get("flash")
+	render(w, r, views.Dashboard(sortedSnapshots(), flash, gateway.Notifier().Enabled()))
 }
 
 func handleDevicesPartial(w http.ResponseWriter, r *http.Request) {
@@ -100,6 +104,16 @@ func handleBeeperForm(w http.ResponseWriter, r *http.Request) {
 		flash = "Error: " + err.Error()
 	}
 	redirectWithFlash(w, r, "/device/"+serial, flash)
+}
+
+func handleAlertsTestForm(w http.ResponseWriter, r *http.Request) {
+	flash := "Test SMS sent — check your phone."
+	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
+	defer cancel()
+	if err := gateway.Notifier().TestSend(ctx); err != nil {
+		flash = "Error: " + err.Error()
+	}
+	redirectWithFlash(w, r, "/", flash)
 }
 
 // render writes a templ component as the HTTP response.

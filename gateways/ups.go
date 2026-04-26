@@ -88,6 +88,12 @@ func (g *UPSGateway) SetNotifier(n *Notifier) {
 	g.notifier = n
 }
 
+// Notifier returns the attached notifier (or nil if SMS is disabled).
+// Used by the web UI's "Test SMS" handler.
+func (g *UPSGateway) Notifier() *Notifier {
+	return g.notifier
+}
+
 // Start runs the first poll synchronously so the cache is non-empty before
 // callers begin serving traffic, then launches the background poller. The
 // poller exits when ctx is cancelled.
