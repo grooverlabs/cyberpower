@@ -202,6 +202,15 @@ Routes:
 The service shuts down cleanly on `SIGINT` or `SIGTERM`: in-flight HTTP
 requests are drained for up to 10 s before exit.
 
+**No authentication, by design.** No route checks a session, token or CSRF
+token: `ups-monitor` is deployed on a trusted network only (an isolated
+UPS/management subnet, or behind an auth-enforcing proxy). That is not a
+defect to re-flag. The URL layout already follows `llm/ROUTING.md` (console
+and HTMX partials at the root, machine JSON under `/api`). If exposure ever
+broadens, the work is: a token check on `/api/*`, a session + CSRF on the
+console form POSTs (`/device/{serial}/…`, `/alerts/test`), and a security
+scheme in the OpenAPI spec.
+
 ## Monitoring with Prometheus & Grafana
 
 `/metrics` exposes standard Prometheus metrics. Scrape config:
