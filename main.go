@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -33,7 +34,14 @@ func init() {
 // gateway is initialised in main and shared by every handler/collector.
 var gateway *gateways.UPSGateway
 
+// version is set at build time by vulcan (-ldflags -X main.version=...).
+var version = "dev"
+
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "version" {
+		fmt.Println(version)
+		return
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -76,7 +84,7 @@ func main() {
 	// Web dashboard, partials and form-POST endpoints.
 	registerWebRoutes(s)
 
-	fmt.Println("Server starting on http://0.0.0.0:9999")
+	fmt.Printf("ups-monitor %s starting on http://0.0.0.0:9999\n", version)
 	fmt.Println("Swagger UI available at http://0.0.0.0:9999/swagger")
 	fmt.Println("Metrics available at http://0.0.0.0:9999/metrics")
 

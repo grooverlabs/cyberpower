@@ -1,0 +1,113 @@
+# CI for cyberpower (llm/TESTING.md §10). Runs what a developer runs:
+# `vulcan generate`, golangci-lint, `vulcan test`, govulncheck. No database.
+#
+# Private sibling: tested with ../vulcan, which the default GITHUB_TOKEN cannot
+# read; it is checked out with the org secret GL_CI_READ_TOKEN (Contents: read).
+name: CI
+
+# Docs-only pushes skip CI (Actions minutes are scarce; vulcan-0019). docs/ is
+# monitoring config and openapi.json, which nothing embeds.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '*.md'
+      - '**/AGENTS.md'
+      - 'docs/**'
+  pull_request:
+    paths-ignore:
+      - '*.md'
+      - '**/AGENTS.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REPO: cyberpower
+  GOWORK: "off"
+  TEMPL_VERSION: v0.3.1100      # must match github.com/a-h/templ in go.mod
+  TAILWIND_VERSION: v4.2.2
+  GOLANGCI_LINT_VERSION: v2.15.0
+  GOVULNCHECK_VERSION: v1.9.0
+  LINT_BASELINE: c6e72540aa1f4b8f7ab632b1cfdd5b5f01701b7f   # main when CI went live
+
+jobs:
+  ci:
+    name: generate, lint, test
+    # Fallback when glci01 is down: runs-on: ubuntu-26.04 (llm/TESTING.md §10).
+    runs-on: [self-hosted, gl-ci]
+    timeout-minutes: 15
+
+    steps:
+      - name: Require GL_CI_READ_TOKEN
+        env:
+          TOKEN: ${{ secrets.GL_CI_READ_TOKEN }}
+        run: |
+          [ -n "$TOKEN" ] || { echo "::error::Org secret GL_CI_READ_TOKEN is missing — see the header of this workflow."; exit 1; }
+
+      - uses: actions/checkout@v7
+        with:
+          path: ${{ env.REPO }}
+          fetch-depth: 0   # lint compares against LINT_BASELINE below
+
+      - name: Check out vulcan
+        uses: actions/checkout@v7
+        with:
+          repository: grooverlabs/vulcan
+          token: ${{ secrets.GL_CI_READ_TOKEN }}
+          path: vulcan
+          persist-credentials: false
+
+      # Installs the go.mod `toolchain` version, not the `go` line (llm/BUILD.md).
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: ${{ env.REPO }}/go.mod
+          cache: ${{ runner.environment == 'github-hosted' }}
+          cache-dependency-path: ${{ env.REPO }}/go.sum
+
+      - name: Install code-gen tools and vulcan
+        run: |
+          go install github.com/a-h/templ/cmd/templ@${TEMPL_VERSION}
+          curl -sSfL -o "$HOME/go/bin/tailwindcss" \
+            "https://github.com/tailwindlabs/tailwindcss/releases/download/${TAILWIND_VERSION}/tailwindcss-linux-x64"
+          chmod +x "$HOME/go/bin/tailwindcss"
+          (cd vulcan && go install -ldflags "-X main.version=$(git describe --tags --always)" ./cmd/vulcan)
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Generate
+        id: generate
+        working-directory: ${{ env.REPO }}
+        run: vulcan generate
+
+      # Lint only lines changed since LINT_BASELINE, like the services
+      # (llm/TESTING.md §10): the pre-existing findings are a backlog.
+      - name: Lint (changes since LINT_BASELINE)
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          skip-cache: ${{ runner.environment == 'self-hosted' }}
+          working-directory: ${{ env.REPO }}
+          args: --new-from-rev=${{ env.LINT_BASELINE }}
+
+      - name: Test
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
+        working-directory: ${{ env.REPO }}
+        run: vulcan test --skip-generate
+
+      # Known CVEs in reachable code: dependencies and the standard library
+      # of the toolchain above (llm/TESTING.md §10).
+      - name: govulncheck
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
+        working-directory: ${{ env.REPO }}
+        run: go run golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION} ./...
+
+      - name: Build both binaries for the Pi
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
+        working-directory: ${{ env.REPO }}
+        run: vulcan build --arch arm64 --os linux --skip-generate

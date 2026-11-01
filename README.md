@@ -53,33 +53,19 @@ never overlap with the poller or each other.
 
 ## Installation
 
-### Prerequisites (from-source builds only)
-
-The `make build` pipeline runs `tailwindcss` and `templ generate` before
-compiling. Install them once:
-
-```bash
-# Templ (Go template engine)
-go install github.com/a-h/templ/cmd/templ@latest
-
-# Tailwind CSS standalone CLI (no Node required)
-# https://github.com/tailwindlabs/tailwindcss/releases
-curl -sLo ~/.local/bin/tailwindcss \
-  https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64
-chmod +x ~/.local/bin/tailwindcss
-```
-
-The generated `app.css` is committed, so plain `go build` works without
-the Tailwind CLI; only `make build` re-runs it.
-
 ### From source
 
+Builds go through [vulcan](https://github.com/grooverlabs/vulcan) (`llm/BUILD.md`):
+`make` targets are one-line aliases over it, and `vulcan.yaml` holds the
+constants. `make build` runs `tailwindcss` and `templ generate` (neither
+output is committed) and stamps the version from `git describe`; `make doctor`
+checks the tools.
+
 ```bash
-git clone <repository-url>
-cd cyberpower
 make build                  # native architecture
 make build ARCH=arm64       # Raspberry Pi / 64-bit ARM
-make build ARCH=amd64       # Intel/AMD 64-bit
+make test                   # vulcan test (race)
+make lint
 ```
 
 Binaries land in `dist/`:
@@ -89,6 +75,8 @@ dist/ups-cli-<arch>
 dist/ups-monitor-<arch>
 ```
 
+Both print their version with `ups-monitor version` / `ups-cli version`.
+
 ### As a Debian package
 
 The repo ships an `nfpm.yaml` that produces a `.deb` containing the
@@ -96,7 +84,7 @@ binaries, the systemd unit, the udev rule, and a dedicated
 `ups-monitor` service user.
 
 ```bash
-make package ARCH=arm64     # or amd64
+make package ARCH=arm64     # or amd64 → dist/cyberpower-ups_<version>_<arch>.deb
 sudo dpkg -i dist/cyberpower-ups_*.deb
 ```
 

@@ -1,0 +1,28 @@
+# Same linter set as helios/triton/neptune/vulcan (llm/BUILD.md §Makefile
+# `lint`).
+version: "2"
+run:
+  timeout: 5m
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - staticcheck   # v2 absorbs gosimple
+    - ineffassign
+    - unconvert
+    - gosec
+  settings:
+    errcheck:
+      check-type-assertions: true
+    gosec:
+      excludes:
+        - G104 # duplicates errcheck
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+formatters:
+  enable:
+    - gofmt

@@ -1,0 +1,18 @@
+# vulcan.yaml — cyberpower. Per-repo constants for the vulcan CLI
+# (github.com/grooverlabs/vulcan; see llm/BUILD.md). No database, no dev loop:
+# build, package, generate and test only.
+binary: ups-monitor
+
+generate:
+  tailwind: { in: assets/static/css/app.src.css, out: assets/static/css/app.css }
+  templ: true
+
+build:
+  main: .
+  extra:
+    - { binary: ups-cli, main: ./cmd/ups-cli }
+
+# The installed package is cyberpower-ups (nfpm.yaml), not ups-monitor.
+package: { name: cyberpower-ups }
+
+test: { race: true }
