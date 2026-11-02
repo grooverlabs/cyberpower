@@ -2,7 +2,9 @@
 # `vulcan generate`, golangci-lint, `vulcan test`, govulncheck. No database.
 #
 # Private sibling: tested with ../vulcan, which the default GITHUB_TOKEN cannot
-# read; it is checked out with the org secret GL_CI_READ_TOKEN (Contents: read).
+# read; it is checked out with GL_CI_READ_TOKEN (Contents: read), a repository
+# secret in each repo that uses it (org secrets are unavailable to private
+# repos on our plan).
 name: CI
 
 # Docs-only pushes skip CI (Actions minutes are scarce; vulcan-0019). docs/ is
@@ -51,7 +53,7 @@ jobs:
         env:
           TOKEN: ${{ secrets.GL_CI_READ_TOKEN }}
         run: |
-          [ -n "$TOKEN" ] || { echo "::error::Org secret GL_CI_READ_TOKEN is missing — see the header of this workflow."; exit 1; }
+          [ -n "$TOKEN" ] || { echo "::error::Repository secret GL_CI_READ_TOKEN is missing — see the header of this workflow."; exit 1; }
 
       - uses: actions/checkout@v7
         with:
