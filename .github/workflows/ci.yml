@@ -40,8 +40,10 @@ env:
 jobs:
   ci:
     name: generate, lint, test
-    # Fallback when glci01 is down: runs-on: ubuntu-26.04 (llm/TESTING.md §10).
-    runs-on: [self-hosted, gl-ci]
+    # GitHub-hosted, not glci01: this repo is public, and the org's runner
+    # group does not serve public repos (a self-hosted runner must never run
+    # code a public repo can change). Hosted minutes are free for public repos.
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
 
     steps:
